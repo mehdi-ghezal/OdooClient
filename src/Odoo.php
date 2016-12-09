@@ -2,6 +2,7 @@
 
 /**
  * (c) Jacob Steringa <jacobsteringa@gmail.com>
+ * (c) Mehdi Ghezal <mehdi.ghezal@gmail.com>
  *
  * For the full copyright and license information, please view the LICENSE
  * file that was distributed with this source code.
@@ -9,6 +10,7 @@
 
 namespace Jsg\Odoo;
 
+use Symfony\Component\OptionsResolver\OptionsResolver;
 use Zend\XmlRpc\Client as XmlRpcClient;
 use Zend\XmlRpc\Request;
 use Zend\XmlRpc\Response;
@@ -22,6 +24,7 @@ use Zend\XmlRpc\Response;
  * and Xml libraries from ZF.
  *
  * @author  Jacob Steringa <jacobsteringa@gmail.com>
+ * @author  Mehdi Ghezal <mehdi.ghezal@gmail.com>
  */
 class Odoo
 {
@@ -84,11 +87,11 @@ class Odoo
     /**
      * Odoo constructor
      *
-     * @param string     $host                  The url
-     * @param string     $database              The database to log into
-     * @param string     $user                  The username
-     * @param string     $password              Password of the user
-     * @param callable   $httpClientProvider    Optional: A callable return a custom Zend\Http\Client to initialize the XmlRpcClient with
+     * @param string $host The url
+     * @param string $database The database to log into
+     * @param string $user The username
+     * @param string $password Password of the user
+     * @param callable $httpClientProvider Optional: A callable return a custom Zend\Http\Client to initialize the XmlRpcClient with
      */
     public function __construct($host, $database, $user, $password, callable $httpClientProvider = null)
     {
@@ -107,61 +110,109 @@ class Odoo
      */
     public function version()
     {
-        $response = $this->getClient('common')->call('version');
+        return $this->getClient('common')->call('version');
+    }
 
-        return $response;
+    /**
+     * Configure default options of the Odoo PHP Client
+     *
+     * @param OptionsResolver $resolver
+     * @param array $defaultOptions
+     * @return OptionsResolver
+     */
+    public function configureOptions(OptionsResolver $resolver, $defaultOptions = array())
+    {
+        $resolver->setDefaults(array(
+            'offset' => 0,
+            'limit' => 100,
+            'order' => 'name ASC',
+            'fields' => array(),
+            'context' => array(),
+        ));
+
+        $resolver->setDefaults($resolver->resolve($defaultOptions));
+
+        return $resolver;
     }
 
     /**
      * Search models
      *
-     * @param string  $model  Model
-     * @param array   $data   Array of criteria
-     * @param integer $offset Offset
-     * @param integer $limit  Max results
+     * @param string $model Model
+     * @param array $domainFilter Array of criteria @see https://www.odoo.com/documentation/10.0/reference/orm.html#domains
+     * @param array $options Array of options
      *
      * @return array Array of model id's
      */
-    public function search($model, $data, $offset = 0, $limit = 100)
+    public function search($model, $domainFilter, $options = array())
     {
+        $resolver = new OptionsResolver();
+        $options = $this->configureOptions($resolver)->resolve($options);
+
         $params = $this->buildParams(array(
             $model,
             'search',
-            $data,
-            $offset,
-            $limit
+            $domainFilter,
+            $options['offset'],
+            $options['limit'],
+            $options['order'],
+            $options['context'],
         ));
 
-        $response = $this->getClient('object')->call('execute', $params);
-
-        return $response;
+        return $this->getClient('object')->call('execute', $params);
     }
 
     /**
      * Search and read models
      *
-     * @param string  $model  Model
-     * @param array   $data   Array of criteria
-     * @param array   $fields Index array of fields to fetch, an empty array fetches all fields
-     * @param integer $offset Offset
-     * @param integer $limit  Max results
+     * @param string $model Model
+     * @param array $domainFilter Array of criteria @see https://www.odoo.com/documentation/10.0/reference/orm.html#domains
+     * @param array $options Array of options
      *
-     * @return array Array of model id's
+     * @return array An array of models
      */
-    public function searchRead($model, $data, $fields = array(), $offset = 0, $limit = 100)
+    public function searchRead($model, $domainFilter, $options = array())
     {
+        $resolver = new OptionsResolver();
+        $options = $this->configureOptions($resolver)->resolve($options);
+
         $params = $this->buildParams(array(
             $model,
             'search_read',
-            $data,
-            $fields,
-            $offset,
-            $limit
+            $domainFilter,
+            $options['fields'],
+            $options['offset'],
+            $options['limit'],
+            $options['order'],
+            $options['context'],
         ));
 
-        $response = $this->getClient('object')->call('execute', $params);
+        return $this->getClient('object')->call('execute', $params);
+    }
 
-        return $response;
+    /**
+     * Read model(s)
+     *
+     * @param string $model Model
+     * @param array $ids Array of model id's
+     * @param array $options Array of options
+     *
+     * @return array An array of models
+     */
+    public function read($model, $ids, $options = array())
+    {
+        $resolver = new OptionsResolver();
+        $options = $this->configureOptions($resolver)->resolve($options);
+
+        $params = $this->buildParams(array(
+            $model,
+            'read',
+            $ids,
+            $options['fields'],
+            $options['context'],
+        ));
+
+        return $this->getClient('object')->call('execute', $params);
     }
 
     /**
@@ -178,29 +229,6 @@ class Odoo
             $model,
             'create',
             $data
-        ));
-
-        $response = $this->getClient('object')->call('execute', $params);
-
-        return $response;
-    }
-
-    /**
-     * Read model(s)
-     *
-     * @param string $model  Model
-     * @param array  $ids    Array of model id's
-     * @param array  $fields Index array of fields to fetch, an empty array fetches all fields
-     *
-     * @return array An array of models
-     */
-    public function read($model, $ids, $fields = array())
-    {
-        $params = $this->buildParams(array(
-            $model,
-            'read',
-            $ids,
-            $fields
         ));
 
         $response = $this->getClient('object')->call('execute', $params);
