@@ -294,6 +294,16 @@ class Odoo
     }
 
     /**
+     * Return last XML-RPC Client
+     *
+     * @return XmlRpcClient
+     */
+    public function getLastXmlRpcClient()
+    {
+        return $this->lastClient;
+    }
+
+    /**
      * Return last request
      *
      * @return Request
