@@ -11,6 +11,8 @@ namespace Jsg\Odoo;
 
 use Zend\Http\Client as HttpClient;
 use Zend\XmlRpc\Client as XmlRpcClient;
+use Zend\XmlRpc\Request;
+use Zend\XmlRpc\Response;
 
 /**
  * Odoo is an PHP client for the xmlrpc api of Odoo, formerly known as OpenERP.
@@ -60,18 +62,18 @@ class Odoo
     protected $password;
 
     /**
+     * XmlRpc Clients
+     *
+     * @var XmlRpcClient[]
+     */
+    protected $clients;
+
+    /**
      * XmlRpc Client
      *
      * @var XmlRpcClient
      */
-    protected $client;
-
-    /**
-     * XmlRpc endpoint
-     *
-     * @var string
-     */
-    protected $path;
+    protected $lastClient;
 
     /**
      * Optional custom http client to initialize the XmlRpcClient with
@@ -96,6 +98,7 @@ class Odoo
         $this->user = $user;
         $this->password = $password;
         $this->httpClient = $httpClient;
+        $this->clients = array();
     }
 
     /**
@@ -294,21 +297,21 @@ class Odoo
     /**
      * Return last request
      *
-     * @return string
+     * @return Request
      */
     public function getLastRequest()
     {
-        return $this->getClient()->getLastRequest();
+        return $this->lastClient ? $this->lastClient->getLastRequest() : null;
     }
 
     /**
      * Return last response
      *
-     * @return string
+     * @return Response
      */
     public function getLastResponse()
     {
-        return $this->getClient()->getLastResponse();
+        return $this->lastClient ? $this->lastClient->getLastResponse() : null;
     }
 
     /**
@@ -344,30 +347,24 @@ class Odoo
      * If no endpoint is specified or if a client for the requested endpoint is
      * already initialized, the last used client will be returned.
      *
-     * @param null|string $path The api endpoint
+     * @param string $path The api endpoint
      *
      * @return XmlRpcClient
      */
-    protected function getClient($path = null)
+    protected function getClient($path)
     {
-        if ($path === null) {
-            return $this->client;
+        if (! isset($this->clients[$path])) {
+            $this->clients[$path] = new XmlRpcClient($this->host . '/' . $path, $this->httpClient);
+
+            // The introspection done by the Zend XmlRpc client is probably specific
+            // to Zend XmlRpc servers. To prevent polution of the Odoo logs with errors
+            // resulting from this introspection calls we disable it.
+            $this->clients[$path]->setSkipSystemLookup(true);
         }
 
-        if ($this->path === $path) {
-            return $this->client;
-        }
+        $this->lastClient = $this->clients[$path];
 
-        $this->path = $path;
-
-        $this->client = new XmlRpcClient($this->host . '/' . $path, $this->httpClient);
-
-        // The introspection done by the Zend XmlRpc client is probably specific
-        // to Zend XmlRpc servers. To prevent polution of the Odoo logs with errors
-        // resulting from this introspection calls we disable it.
-        $this->client->setSkipSystemLookup(true);
-
-        return $this->client;
+        return $this->clients[$path];
     }
 
     /**
