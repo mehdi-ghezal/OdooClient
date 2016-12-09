@@ -9,7 +9,6 @@
 
 namespace Jsg\Odoo;
 
-use Zend\Http\Client as HttpClient;
 use Zend\XmlRpc\Client as XmlRpcClient;
 use Zend\XmlRpc\Request;
 use Zend\XmlRpc\Response;
@@ -76,28 +75,28 @@ class Odoo
     protected $lastClient;
 
     /**
-     * Optional custom http client to initialize the XmlRpcClient with
+     * Optional: A callable return a custom Zend\Http\Client to initialize the XmlRpcClient with
      *
-     * @var HttpClient
+     * @var callable
      */
-    protected $httpClient;
+    protected $httpClientProvider;
 
     /**
      * Odoo constructor
      *
-     * @param string     $host       The url
-     * @param string     $database   The database to log into
-     * @param string     $user       The username
-     * @param string     $password   Password of the user
-     * @param HttpClient $httpClient An optional custom http client to initialize the XmlRpcClient with
+     * @param string     $host                  The url
+     * @param string     $database              The database to log into
+     * @param string     $user                  The username
+     * @param string     $password              Password of the user
+     * @param callable   $httpClientProvider    Optional: A callable return a custom Zend\Http\Client to initialize the XmlRpcClient with
      */
-    public function __construct($host, $database, $user, $password, HttpClient $httpClient = null)
+    public function __construct($host, $database, $user, $password, callable $httpClientProvider = null)
     {
         $this->host = $host;
         $this->database = $database;
         $this->user = $user;
         $this->password = $password;
-        $this->httpClient = $httpClient;
+        $this->httpClientProvider = $httpClientProvider;
         $this->clients = array();
     }
 
@@ -315,13 +314,13 @@ class Odoo
     }
 
     /**
-     * Set custom http client
+     * Set a callable return a custom Zend\Http\Client to initialize the XmlRpcClient with
      *
-     * @param HttpClient $httpClient
+     * @param callable $httpClientProvider
      */
-    public function setHttpClient(HttpClient $httpClient)
+    public function setHttpClientProvider(callable $httpClientProvider)
     {
-        $this->httpClient = $httpClient;
+        $this->httpClientProvider = $httpClientProvider;
     }
 
     /**
@@ -354,7 +353,9 @@ class Odoo
     protected function getClient($path)
     {
         if (! isset($this->clients[$path])) {
-            $this->clients[$path] = new XmlRpcClient($this->host . '/' . $path, $this->httpClient);
+            $httpClient = $this->httpClientProvider ? call_user_func($this->httpClientProvider) : null;
+
+            $this->clients[$path] = new XmlRpcClient($this->host . '/' . $path, $httpClient);
 
             // The introspection done by the Zend XmlRpc client is probably specific
             // to Zend XmlRpc servers. To prevent polution of the Odoo logs with errors
