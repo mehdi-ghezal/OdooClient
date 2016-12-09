@@ -111,23 +111,7 @@ class Odoo
     }
 
     /**
-     * Get timezone
-     *
-     * @return string Current timezone
-     */
-    public function timezone()
-    {
-        $params = array(
-            $this->database,
-            $this->user,
-            $this->password
-        );
-
-        return $this->getClient('common')->call('timezone_get', $params);
-    }
-
-    /**
-     * Search models
+     * Search models    
      *
      * @param string  $model  Model
      * @param array   $data   Array of criteria
