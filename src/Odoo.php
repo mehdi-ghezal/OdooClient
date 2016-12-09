@@ -85,6 +85,13 @@ class Odoo
     protected $httpClientProvider;
 
     /**
+     * Default options for Odoo PHP Clients
+     *
+     * @var array
+     */
+    protected $defaultOptions;
+
+    /**
      * Odoo constructor
      *
      * @param string $host The url
@@ -101,6 +108,25 @@ class Odoo
         $this->password = $password;
         $this->httpClientProvider = $httpClientProvider;
         $this->clients = array();
+
+        $this->defaultOptions = array(
+            'offset' => 0,
+            'limit' => 100,
+            'order' => 'name ASC',
+            'fields' => array(),
+            'context' => array(),
+        );
+    }
+
+    /**
+     * Configure default options of the Odoo PHP Client
+     *
+     * @param array $options
+     */
+    public function configureDefaultsOptions(array $options)
+    {
+        $resolver = new OptionsResolver();
+        $this->defaultOptions = $this->configureOptions($resolver)->resolve($options);
     }
 
     /**
@@ -111,28 +137,6 @@ class Odoo
     public function version()
     {
         return $this->getClient('common')->call('version');
-    }
-
-    /**
-     * Configure default options of the Odoo PHP Client
-     *
-     * @param OptionsResolver $resolver
-     * @param array $defaultOptions
-     * @return OptionsResolver
-     */
-    public function configureOptions(OptionsResolver $resolver, $defaultOptions = array())
-    {
-        $resolver->setDefaults(array(
-            'offset' => 0,
-            'limit' => 100,
-            'order' => 'name ASC',
-            'fields' => array(),
-            'context' => array(),
-        ));
-
-        $resolver->setDefaults($resolver->resolve($defaultOptions));
-
-        return $resolver;
     }
 
     /**
@@ -424,5 +428,16 @@ class Odoo
         }
 
         return $this->uid;
+    }
+
+    /**
+     * Configure options
+     *
+     * @param OptionsResolver $resolver
+     * @return OptionsResolver
+     */
+    protected function configureOptions(OptionsResolver $resolver)
+    {
+        return $resolver->setDefaults($this->defaultOptions);
     }
 }
