@@ -113,7 +113,7 @@ class Odoo
     }
 
     /**
-     * Search models    
+     * Search models
      *
      * @param string  $model  Model
      * @param array   $data   Array of criteria
@@ -138,7 +138,7 @@ class Odoo
     }
 
     /**
-     * Search models
+     * Search and read models
      *
      * @param string  $model  Model
      * @param array   $data   Array of criteria
@@ -152,11 +152,11 @@ class Odoo
     {
         $params = $this->buildParams(array(
             $model,
-                'search_read',
-                $data,
-                $fields,
-                $offset,
-                $limit
+            'search_read',
+            $data,
+            $fields,
+            $offset,
+            $limit
         ));
 
         $response = $this->getClient('object')->call('execute', $params);
