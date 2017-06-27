@@ -10,10 +10,13 @@
 
 namespace Jsg\Odoo;
 
-use Symfony\Component\OptionsResolver\OptionsResolver;
 use Zend\XmlRpc\Client as XmlRpcClient;
 use Zend\XmlRpc\Request;
 use Zend\XmlRpc\Response;
+use Symfony\Component\OptionsResolver\OptionsResolver;
+use Psr\SimpleCache\CacheInterface;
+use Psr\Log\LoggerAwareTrait;
+use DateInterval;
 
 /**
  * Odoo is an PHP client for the xmlrpc api of Odoo, formerly known as OpenERP.
@@ -28,6 +31,8 @@ use Zend\XmlRpc\Response;
  */
 class Odoo
 {
+    use LoggerAwareTrait;
+
     /**
      * Host to connect to
      *
@@ -85,11 +90,31 @@ class Odoo
     protected $httpClientProvider;
 
     /**
+     * @var OptionsResolver
+     */
+    protected $optionsResolver;
+
+    /**
      * Default options for Odoo PHP Clients
      *
      * @var array
      */
     protected $defaultOptions;
+
+    /**
+     * @var CacheInterface
+     */
+    protected $cache;
+
+    /**
+     * @var bool
+     */
+    protected $cacheActive = false;
+
+    /**
+     * @var null|int|\DateInterval
+     */
+    protected $cacheTTL = null;
 
     /**
      * Odoo constructor
@@ -119,14 +144,46 @@ class Odoo
     }
 
     /**
+     * @param CacheInterface $cache
+     * @return $this
+     */
+    public function setCache(CacheInterface $cache)
+    {
+        $this->cache = $cache;
+
+        return $this;
+    }
+
+    /**
+     * @param null|int|DateInterval $ttl
+     * @return $this
+     */
+    public function withCache($ttl = null)
+    {
+        if (! $this->cache) {
+            $this->debug('The cache cannot be acivated as no cache component has been registered.');
+
+            return $this;
+        }
+
+        $this->cacheActive = true;
+        $this->cacheTTL = $ttl;
+
+        return $this;
+    }
+
+    /**
      * Configure default options of the Odoo PHP Client
      *
      * @param array $options
+     * @return $this
      */
     public function configureDefaultsOptions(array $options)
     {
-        $resolver = new OptionsResolver();
-        $this->defaultOptions = $this->configureOptions($resolver)->resolve($options);
+        $this->debug('Configure defaults options', $options);
+        $this->defaultOptions = $this->resolveOptions($options);
+
+        return $this;
     }
 
     /**
@@ -150,8 +207,7 @@ class Odoo
      */
     public function search($model, $domainFilter, $options = array())
     {
-        $resolver = new OptionsResolver();
-        $options = $this->configureOptions($resolver)->resolve($options);
+        $options = $this->resolveOptions($options);
 
         $params = $this->buildParams(array(
             $model,
@@ -163,7 +219,7 @@ class Odoo
             $options['context'],
         ));
 
-        return $this->getClient('object')->call('execute', $params);
+        return $this->_searchOrRead($model, $params);
     }
 
     /**
@@ -177,10 +233,9 @@ class Odoo
      */
     public function searchRead($model, $domainFilter, $options = array())
     {
-        $resolver = new OptionsResolver();
-        $options = $this->configureOptions($resolver)->resolve($options);
+        $options = $this->resolveOptions($options);
 
-        $params = $this->buildParams(array(
+        $params = $this->buildParams([
             $model,
             'search_read',
             $domainFilter,
@@ -189,9 +244,9 @@ class Odoo
             $options['limit'],
             $options['order'],
             $options['context'],
-        ));
+        ]);
 
-        return $this->getClient('object')->call('execute', $params);
+        return $this->_searchOrRead($model, $params);
     }
 
     /**
@@ -203,20 +258,19 @@ class Odoo
      *
      * @return array An array of models
      */
-    public function read($model, $ids, $options = array())
+    public function read($model, $ids, $options = [])
     {
-        $resolver = new OptionsResolver();
-        $options = $this->configureOptions($resolver)->resolve($options);
+        $options = $this->resolveOptions($options);
 
-        $params = $this->buildParams(array(
+        $params = $this->buildParams([
             $model,
             'read',
             $ids,
             $options['fields'],
             $options['context'],
-        ));
+        ]);
 
-        return $this->getClient('object')->call('execute', $params);
+        return $this->_searchOrRead($model, $params);
     }
 
     /**
@@ -229,11 +283,16 @@ class Odoo
      */
     public function create($model, $data)
     {
-        $params = $this->buildParams(array(
+        $options = $this->resolveOptions([]);
+
+        $params = $this->buildParams([
             $model,
             'create',
-            $data
-        ));
+            $data,
+            $options['context'],
+        ]);
+
+        $this->debug(sprintf('Create model %s', $model), $params);
 
         $response = $this->getClient('object')->call('execute', $params);
 
@@ -251,12 +310,17 @@ class Odoo
      */
     public function write($model, $ids, $fields)
     {
-        $params = $this->buildParams(array(
+        $options = $this->resolveOptions([]);
+
+        $params = $this->buildParams([
             $model,
             'write',
             $ids,
-            $fields
-        ));
+            $fields,
+            $options['context'],
+        ]);
+
+        $this->debug(sprintf('Write model %s', $model), $params);
 
         $response = $this->getClient('object')->call('execute', $params);
 
@@ -273,56 +337,18 @@ class Odoo
      */
     public function unlink($model, $ids)
     {
-        $params = $this->buildParams(array(
+        $options = $this->resolveOptions([]);
+
+        $params = $this->buildParams([
             $model,
             'unlink',
-            $ids
-        ));
+            $ids,
+            $options['context'],
+        ]);
+
+        $this->debug(sprintf('Unlink model %s', $model), $params);
 
         return $this->getClient('object')->call('execute', $params);
-    }
-
-    /**
-     * Get report for model
-     *
-     * @param string $model Model
-     * @param array  $ids   Array of id's, for this method it should typically be an array with one id
-     * @param string $type  Report type
-     *
-     * @return mixed A report file
-     */
-    public function getReport($model, $ids, $type = 'qweb-pdf')
-    {
-        $params = $this->buildParams(array(
-            $model,
-            $ids,
-            array(
-                'model' => $model,
-                'id' => $ids[0],
-                'report_type' => $type
-            )
-        ));
-
-        $client = $this->getClient('report');
-
-        $reportId = $client->call('report', $params);
-
-        $state = false;
-
-        while (!$state) {
-            $report = $client->call(
-                'report_get',
-                $this->buildParams(array($reportId))
-            );
-
-            $state = $report['state'];
-
-            if (!$state) {
-                sleep(1);
-            }
-        }
-
-        return base64_decode($report['result']);
     }
 
     /**
@@ -359,10 +385,51 @@ class Odoo
      * Set a callable return a custom Zend\Http\Client to initialize the XmlRpcClient with
      *
      * @param callable $httpClientProvider
+     * @return $this
      */
     public function setHttpClientProvider(callable $httpClientProvider)
     {
         $this->httpClientProvider = $httpClientProvider;
+
+        return $this;
+    }
+
+    /**
+     * @param $model
+     * @param array $params
+     * @return mixed
+     */
+    protected function _searchOrRead($model, array $params)
+    {
+        // Cache is ON
+        if ($this->cacheActive) {
+            $key = $this->calculateCacheKey($params);
+            $this->debug(sprintf('Cache lookup for %s with key %s', $model, $key), $params);
+
+            // Cache match, we use cache
+            if ($this->cache->has($key)) {
+                $this->debug(sprintf('Cache match for model %s with key %s', $model, $key), $params);
+
+                return $this->cache->get($key);
+            }
+
+            // Cache didn't match, we request Odoo
+            $this->debug(sprintf('Cache not match for model %s with key %s, call Odoo API', $model, $key), $params);
+            $results = $this->getClient('object')->call('execute', $params);
+
+            // Save results in cache, and reset cache settings
+            $this->cache->set($key, $results, $this->cacheTTL);
+            $this->cacheActive = false;
+            $this->cacheTTL = null;
+
+            // Return the results
+            return $results;
+        }
+
+        // Cache is OFF
+        $this->debug(sprintf('Cache not use, call Odoo API for model %s', $model), $params);
+
+        return $this->getClient('object')->call('execute', $params);
     }
 
     /**
@@ -374,11 +441,11 @@ class Odoo
      */
     protected function buildParams(array $params)
     {
-        return array_merge(array(
+        return array_merge([
             $this->database,
             $this->uid(),
             $this->password
-        ), $params);
+        ], $params);
     }
 
     /**
@@ -420,24 +487,70 @@ class Odoo
         if ($this->uid === null) {
             $client = $this->getClient('common');
 
-            $this->uid = $client->call('login', array(
+            $this->uid = $client->call('login', [
                 $this->database,
                 $this->user,
                 $this->password
-            ));
+            ]);
         }
 
         return $this->uid;
     }
 
     /**
-     * Configure options
-     *
-     * @param OptionsResolver $resolver
-     * @return OptionsResolver
+     * @param array $options
+     * @return array
      */
-    protected function configureOptions(OptionsResolver $resolver)
+    protected function resolveOptions(array $options)
     {
-        return $resolver->setDefaults($this->defaultOptions);
+        if (! $this->optionsResolver) {
+            $this->optionsResolver = new OptionsResolver();
+            $this->optionsResolver
+                ->setDefined('offset')
+                ->setDefined('limit')
+                ->setDefined('order')
+                ->setDefined('fields')
+                ->setDefined('context')
+
+                ->setAllowedTypes('offset', 'int')
+                ->setAllowedTypes('limit', 'int')
+                ->setAllowedTypes('order', 'string')
+                ->setAllowedTypes('fields', 'array')
+                ->setAllowedTypes('context', 'array')
+
+                ->setAllowedValues('fields', function (array $field) {
+                    return is_string($field);
+                })
+
+                ->setDefaults($this->defaultOptions)
+            ;
+        }
+
+        return $this->optionsResolver->resolve($options);
+    }
+
+    /**
+     * @param string $message
+     * @param array $context
+     * @return $this
+     */
+    protected function debug($message, array $context = [])
+    {
+        if ($this->logger) {
+            $this->logger->debug($message, $context);
+        }
+
+        return $this;
+    }
+
+    /**
+     * @param array $params
+     * @return string
+     */
+    protected function calculateCacheKey(array $params)
+    {
+        array_multisort($params);
+
+        return md5(json_encode($params));
     }
 }
