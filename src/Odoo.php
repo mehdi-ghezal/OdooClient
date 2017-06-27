@@ -90,11 +90,6 @@ class Odoo
     protected $httpClientProvider;
 
     /**
-     * @var OptionsResolver
-     */
-    protected $optionsResolver;
-
-    /**
      * Default options for Odoo PHP Clients
      *
      * @var array
@@ -503,30 +498,34 @@ class Odoo
      */
     protected function resolveOptions(array $options)
     {
-        if (! $this->optionsResolver) {
-            $this->optionsResolver = new OptionsResolver();
-            $this->optionsResolver
-                ->setDefined('offset')
-                ->setDefined('limit')
-                ->setDefined('order')
-                ->setDefined('fields')
-                ->setDefined('context')
+        $optionsResolver = new OptionsResolver();
+        $optionsResolver
+            ->setDefined('offset')
+            ->setDefined('limit')
+            ->setDefined('order')
+            ->setDefined('fields')
+            ->setDefined('context')
 
-                ->setAllowedTypes('offset', 'int')
-                ->setAllowedTypes('limit', 'int')
-                ->setAllowedTypes('order', 'string')
-                ->setAllowedTypes('fields', 'array')
-                ->setAllowedTypes('context', 'array')
+            ->setAllowedTypes('offset', 'int')
+            ->setAllowedTypes('limit', 'int')
+            ->setAllowedTypes('order', 'string')
+            ->setAllowedTypes('fields', 'array')
+            ->setAllowedTypes('context', 'array')
 
-                ->setAllowedValues('fields', function (array $field) {
-                    return is_string($field);
-                })
+            ->setAllowedValues('fields', function (array $fields) {
+                foreach($fields as $field) {
+                    if (! is_string($field)) {
+                        return false;
+                    }
+                }
 
-                ->setDefaults($this->defaultOptions)
-            ;
-        }
+                return true;
+            })
 
-        return $this->optionsResolver->resolve($options);
+            ->setDefaults($this->defaultOptions)
+        ;
+
+        return $optionsResolver->resolve($options);
     }
 
     /**
