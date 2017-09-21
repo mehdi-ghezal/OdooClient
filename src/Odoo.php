@@ -347,6 +347,27 @@ class Odoo
     }
 
     /**
+     * Get a report in PDF Format ; an encoded base64 string is return or false
+     *
+     * @param string $report Report name, for example account.report_invoice
+     * @param array $ids Array of model id's related to the report, for this method it should typically be an array with one id
+     *
+     * @return string|false
+     */
+    public function getReport($report, array $ids)
+    {
+        $client = $this->getClient('report');
+        $params = $this->buildParams([$report, $ids]);
+        $response = $client->call('render_report', $params);
+
+        if ($response && isset($response['state']) && $response['state']) {
+            return base64_decode($response['result']);
+        }
+
+        return false;
+    }
+
+    /**
      * Return last XML-RPC Client
      *
      * @return XmlRpcClient
