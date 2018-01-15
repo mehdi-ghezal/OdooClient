@@ -9,6 +9,10 @@
         {
             "name": "Jacob Steringa",
             "email": "jacobsteringa@gmail.com"
+        },
+        {
+            "name": "Mehdi GHEZAL",
+            "email": "mehdi.ghezal@gmail.com"
         }
     ],
     "require": {
@@ -24,5 +28,10 @@
     "autoload": {
         "psr-4": { "Jsg\\Odoo\\": "src/" }
     },
-    "minimum-stability": "dev"
+    "minimum-stability": "dev",
+    "extra": {
+        "branch-alias": {
+            "dev-master": "1.0.x-dev"
+        }
+    }
 }

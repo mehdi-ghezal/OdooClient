@@ -10,6 +10,7 @@
 
 namespace Jsg\Odoo;
 
+use Jsg\Odoo\Exception\RuntimeException;
 use Zend\XmlRpc\Client as XmlRpcClient;
 use Zend\XmlRpc\Request;
 use Zend\XmlRpc\Response;
@@ -135,6 +136,7 @@ class Odoo
             'order' => 'name ASC',
             'fields' => array(),
             'context' => array(),
+            'lazy' => true,
         );
     }
 
@@ -150,16 +152,17 @@ class Odoo
     }
 
     /**
-     * @param null|int|DateInterval $ttl
+     * @param null|int|DateInterval $ttl Optional. If not specified default value depends of the cache driver.
      * @return $this
+     * @throws RuntimeException
      */
     public function withCache($ttl = null)
     {
         if (! $this->cache) {
-            $this->debug('The cache cannot be acivated as no cache component has been registered.');
-
-            return $this;
+            throw new RuntimeException('The cache cannot be activated as no cache component has been registered.');
         }
+
+        $this->debug('Activate cache with TTL', $ttl);
 
         $this->cacheActive = true;
         $this->cacheTTL = $ttl;
@@ -214,6 +217,8 @@ class Odoo
             $options['context'],
         ));
 
+        $this->debug(sprintf('Search model %s', $model), $params);
+
         return $this->_searchOrRead($model, $params);
     }
 
@@ -241,6 +246,33 @@ class Odoo
             $options['context'],
         ]);
 
+        $this->debug(sprintf('SearchRead model %s', $model), $params);
+
+        return $this->_searchOrRead($model, $params);
+    }
+
+    /**
+     * Search and count models
+     *
+     * @param string $model Model
+     * @param array $domainFilter Array of criteria @see https://www.odoo.com/documentation/10.0/reference/orm.html#domains
+     * @param array $options Array of options
+     *
+     * @return array An array of models
+     */
+    public function searchCount($model, $domainFilter, $options = array())
+    {
+        $options = $this->resolveOptions($options);
+
+        $params = $this->buildParams([
+            $model,
+            'search_read',
+            $domainFilter,
+            $options['context'],
+        ]);
+
+        $this->debug(sprintf('SearchCount model %s', $model), $params);
+
         return $this->_searchOrRead($model, $params);
     }
 
@@ -264,6 +296,45 @@ class Odoo
             $options['fields'],
             $options['context'],
         ]);
+
+        $this->debug(sprintf('Read model %s', $model), $params);
+
+
+        return $this->_searchOrRead($model, $params);
+    }
+
+    /**
+     * Read model(s)
+     *
+     * @param string $model Model
+     * @param array $ids Array of model id's
+     * @param array $options Array of options
+     *
+     * @return array An array of models
+     */
+    public function readGroup($model, $ids, $options = [])
+    {
+        $options = $this->resolveOptions($options);
+
+        if ($options['lazy']) {
+            $options['context']['group_by_no_leaf'] = true;
+        }
+
+        $params = $this->buildParams([
+            $model,
+            'read_group',
+            $options['domain'],
+            $options['fields'],
+            $options['groupBy'],
+            $options['offset'],
+            $options['limit'],
+            $options['context'],
+            $options['order'],
+            $options['lazy'],
+        ]);
+
+        $this->debug(sprintf('ReadGroup model %s', $model), $params);
+
 
         return $this->_searchOrRead($model, $params);
     }
@@ -525,14 +596,19 @@ class Odoo
             ->setDefined('limit')
             ->setDefined('order')
             ->setDefined('fields')
+            ->setDefined('groupBy')
             ->setDefined('context')
+            ->setDefined('lazy')
 
             ->setAllowedTypes('offset', 'int')
             ->setAllowedTypes('limit', 'int')
             ->setAllowedTypes('order', 'string')
             ->setAllowedTypes('fields', 'array')
+            ->setAllowedTypes('groupBy', 'string')
             ->setAllowedTypes('context', 'array')
+            ->setAllowedTypes('lazy', 'bool')
 
+            // For Symfony >= 3.4, we can do it with $resolver->setAllowedTypes('fields', 'string[]');
             ->setAllowedValues('fields', function (array $fields) {
                 foreach($fields as $field) {
                     if (! is_string($field)) {
