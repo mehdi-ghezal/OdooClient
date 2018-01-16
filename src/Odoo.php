@@ -171,7 +171,7 @@ class Odoo
             throw new RuntimeException('The cache cannot be activated as no cache component has been registered.');
         }
 
-        $this->debug('Activate cache with TTL', $ttl);
+        $this->debug('Activate cache with TTL', [$ttl]);
 
         $this->cacheActive = true;
         $this->cacheTTL = $ttl;
