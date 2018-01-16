@@ -14,7 +14,6 @@ use Jsg\Odoo\Exception\RuntimeException;
 use Zend\XmlRpc\Client as XmlRpcClient;
 use Zend\XmlRpc\Request;
 use Zend\XmlRpc\Response;
-use Symfony\Component\OptionsResolver\OptionsResolver;
 use Psr\SimpleCache\CacheInterface;
 use Psr\Log\LoggerAwareTrait;
 use DateInterval;
@@ -141,6 +140,8 @@ class Odoo
     }
 
     /**
+     * Define the cache driver
+     *
      * @param CacheInterface $cache
      * @return $this
      */
@@ -152,6 +153,8 @@ class Odoo
     }
 
     /**
+     * Activate the cache for the next API Call
+     *
      * @param null|int|DateInterval $ttl Optional. If not specified default value depends of the cache driver.
      * @return $this
      * @throws RuntimeException
@@ -179,7 +182,9 @@ class Odoo
     public function configureDefaultsOptions(array $options)
     {
         $this->debug('Configure defaults options', $options);
-        $this->defaultOptions = $this->resolveOptions($options);
+
+        $resolver = new OptionsResolver($this->defaultOptions);
+        $this->defaultOptions = $resolver->resolveDefaults($options);
 
         return $this;
     }
@@ -195,50 +200,63 @@ class Odoo
     }
 
     /**
-     * Search models
+     * Search records
      *
-     * @param string $model Model
-     * @param array $domainFilter Array of criteria @see https://www.odoo.com/documentation/10.0/reference/orm.html#domains
      * @param array $options Array of options
-     *
-     * @return array Array of model id's
+     * @return array Array of record id's
      */
-    public function search($model, $domainFilter, $options = array())
+    public function search(array $options)
     {
-        $options = $this->resolveOptions($options);
+        $resolver = new OptionsResolver($this->defaultOptions);
+        $resolver
+            ->registerModelOptions()
+            ->registerDomainOptions()
+            ->registerOffsetOptions()
+            ->registerLimitOptions()
+            ->registerOrderOptions()
+        ;
+
+        $options = $resolver->resolve($options);
 
         $params = $this->buildParams(array(
-            $model,
+            $options['model'],
             'search',
-            $domainFilter,
+            $options['domain'],
             $options['offset'],
             $options['limit'],
             $options['order'],
             $options['context'],
         ));
 
-        $this->debug(sprintf('Search model %s', $model), $params);
+        $this->debug(sprintf('Search model %s', $options['model']), $params);
 
-        return $this->_searchOrRead($model, $params);
+        return $this->_searchOrRead($options['model'], $params);
     }
 
     /**
-     * Search and read models
+     * Search and read records
      *
-     * @param string $model Model
-     * @param array $domainFilter Array of criteria @see https://www.odoo.com/documentation/10.0/reference/orm.html#domains
      * @param array $options Array of options
-     *
-     * @return array An array of models
+     * @return array An array of records
      */
-    public function searchRead($model, $domainFilter, $options = array())
+    public function searchRead(array $options)
     {
-        $options = $this->resolveOptions($options);
+        $resolver = new OptionsResolver($this->defaultOptions);
+        $resolver
+            ->registerModelOptions()
+            ->registerDomainOptions()
+            ->registerFieldsOptions()
+            ->registerOffsetOptions()
+            ->registerLimitOptions()
+            ->registerOrderOptions()
+        ;
+
+        $options = $resolver->resolve($options);
 
         $params = $this->buildParams([
-            $model,
+            $options['model'],
             'search_read',
-            $domainFilter,
+            $options['domain'],
             $options['fields'],
             $options['offset'],
             $options['limit'],
@@ -246,82 +264,97 @@ class Odoo
             $options['context'],
         ]);
 
-        $this->debug(sprintf('SearchRead model %s', $model), $params);
+        $this->debug(sprintf('SearchRead model %s', $options['model']), $params);
 
-        return $this->_searchOrRead($model, $params);
+        return $this->_searchOrRead($options['model'], $params);
     }
 
     /**
-     * Search and count models
+     * Search records and return the results count
      *
-     * @param string $model Model
-     * @param array $domainFilter Array of criteria @see https://www.odoo.com/documentation/10.0/reference/orm.html#domains
      * @param array $options Array of options
-     *
-     * @return array An array of models
+     * @return int Number of records
      */
-    public function searchCount($model, $domainFilter, $options = array())
+    public function searchCount(array $options)
     {
-        $options = $this->resolveOptions($options);
+        $resolver = new OptionsResolver($this->defaultOptions);
+        $resolver
+            ->registerModelOptions()
+            ->registerDomainOptions()
+        ;
+
+        $options = $resolver->resolve($options);
 
         $params = $this->buildParams([
-            $model,
-            'search_read',
-            $domainFilter,
+            $options['model'],
+            'search_count',
+            $options['domain'],
             $options['context'],
         ]);
 
-        $this->debug(sprintf('SearchCount model %s', $model), $params);
+        $this->debug(sprintf('SearchCount model %s', $options['model']), $params);
 
-        return $this->_searchOrRead($model, $params);
+        return $this->_searchOrRead($options['model'], $params);
     }
 
     /**
-     * Read model(s)
+     * Read record(s) by identifier
      *
-     * @param string $model Model
-     * @param array $ids Array of model id's
      * @param array $options Array of options
-     *
-     * @return array An array of models
+     * @return array An array of records
      */
-    public function read($model, $ids, $options = [])
+    public function read(array $options)
     {
-        $options = $this->resolveOptions($options);
+        $resolver = new OptionsResolver($this->defaultOptions);
+        $resolver
+            ->registerModelOptions()
+            ->registerIdsOptions()
+            ->registerFieldsOptions()
+        ;
+
+        $options = $resolver->resolve($options);
 
         $params = $this->buildParams([
-            $model,
+            $options['model'],
             'read',
-            $ids,
+            $options['ids'],
             $options['fields'],
             $options['context'],
         ]);
 
-        $this->debug(sprintf('Read model %s', $model), $params);
+        $this->debug(sprintf('Read model %s', $options['model']), $params);
 
-
-        return $this->_searchOrRead($model, $params);
+        return $this->_searchOrRead($options['model'], $params);
     }
 
     /**
-     * Read model(s)
+     * Search records with a domain filter and return aggregated results
      *
-     * @param string $model Model
-     * @param array $ids Array of model id's
      * @param array $options Array of options
-     *
-     * @return array An array of models
+     * @return array An array of aggregated records
      */
-    public function readGroup($model, $ids, $options = [])
+    public function readGroup(array $options)
     {
-        $options = $this->resolveOptions($options);
+        $resolver = new OptionsResolver($this->defaultOptions);
+        $resolver
+            ->registerModelOptions()
+            ->registerDomainOptions()
+            ->registerFieldsOptions()
+            ->registerGroupByOptions()
+            ->registerOffsetOptions()
+            ->registerLimitOptions()
+            ->registerOrderOptions()
+            ->registerLazyOptions()
+        ;
+
+        $options = $resolver->resolve($options);
 
         if ($options['lazy']) {
             $options['context']['group_by_no_leaf'] = true;
         }
 
         $params = $this->buildParams([
-            $model,
+            $options['model'],
             'read_group',
             $options['domain'],
             $options['fields'],
@@ -333,32 +366,36 @@ class Odoo
             $options['lazy'],
         ]);
 
-        $this->debug(sprintf('ReadGroup model %s', $model), $params);
+        $this->debug(sprintf('ReadGroup model %s', $options['model']), $params);
 
 
-        return $this->_searchOrRead($model, $params);
+        return $this->_searchOrRead($options['model'], $params);
     }
 
     /**
-     * Create model
+     * Create a record
      *
-     * @param string $model Model
-     * @param array  $data  Array of fields with data (format: ['field' => 'value'])
-     *
-     * @return integer Created model id
+     * @param array $options Array of options
+     * @return integer Created record id
      */
-    public function create($model, $data)
+    public function create(array $options)
     {
-        $options = $this->resolveOptions([]);
+        $resolver = new OptionsResolver($this->defaultOptions);
+        $resolver
+            ->registerModelOptions()
+            ->registerDataOptions()
+        ;
+
+        $options = $resolver->resolve($options);
 
         $params = $this->buildParams([
-            $model,
+            $options['model'],
             'create',
-            $data,
+            $options['data'],
             $options['context'],
         ]);
 
-        $this->debug(sprintf('Create model %s', $model), $params);
+        $this->debug(sprintf('Create model %s', $options['model']), $params);
 
         $response = $this->getClient('object')->call('execute', $params);
 
@@ -366,27 +403,31 @@ class Odoo
     }
 
     /**
-     * Update model(s)
+     * Update record(s)
      *
-     * @param string $model  Model
-     * @param array  $ids    Array of model id's
-     * @param array  $fields A associative array (format: ['field' => 'value'])
-     *
-     * @return array
+     * @param array $options Array of options
+     * @return array An array of records
      */
-    public function write($model, $ids, $fields)
+    public function write(array $options)
     {
-        $options = $this->resolveOptions([]);
+        $resolver = new OptionsResolver($this->defaultOptions);
+        $resolver
+            ->registerModelOptions()
+            ->registerIdsOptions()
+            ->registerDataOptions()
+        ;
+
+        $options = $resolver->resolve($options);
 
         $params = $this->buildParams([
-            $model,
+            $options['model'],
             'write',
-            $ids,
-            $fields,
+            $options['ids'],
+            $options['data'],
             $options['context'],
         ]);
 
-        $this->debug(sprintf('Write model %s', $model), $params);
+        $this->debug(sprintf('Write model %s', $options['model']), $params);
 
         $response = $this->getClient('object')->call('execute', $params);
 
@@ -396,23 +437,27 @@ class Odoo
     /**
      * Unlink model(s)
      *
-     * @param string $model Model
-     * @param array  $ids   Array of model id's
-     *
-     * @return boolean True is successful
+     * @param array $options Array of options
+     * @return boolean True if successful
      */
-    public function unlink($model, $ids)
+    public function unlink(array $options)
     {
-        $options = $this->resolveOptions([]);
+        $resolver = new OptionsResolver($this->defaultOptions);
+        $resolver
+            ->registerModelOptions()
+            ->registerIdsOptions()
+        ;
+
+        $options = $resolver->resolve($options);
 
         $params = $this->buildParams([
-            $model,
+            $options['model'],
             'unlink',
-            $ids,
+            $options['ids'],
             $options['context'],
         ]);
 
-        $this->debug(sprintf('Unlink model %s', $model), $params);
+        $this->debug(sprintf('Unlink model %s', $options['model']), $params);
 
         return $this->getClient('object')->call('execute', $params);
     }
@@ -420,15 +465,21 @@ class Odoo
     /**
      * Get a report in PDF Format ; an encoded base64 string is return or false
      *
-     * @param string $report Report name, for example account.report_invoice
-     * @param array $ids Array of model id's related to the report, for this method it should typically be an array with one id
-     *
+     * @param array $options Array of options
      * @return string|false
      */
-    public function getReport($report, array $ids)
+    public function getReport(array $options)
     {
+        $resolver = new OptionsResolver($this->defaultOptions);
+        $resolver
+            ->registerReportOptions()
+            ->registerIdsOptions()
+        ;
+
+        $options = $resolver->resolve($options);
+
         $client = $this->getClient('report');
-        $params = $this->buildParams([$report, $ids]);
+        $params = $this->buildParams([$options['report'], $options['ids']]);
         $response = $client->call('render_report', $params);
 
         if ($response && isset($response['state']) && $response['state']) {
@@ -582,47 +633,6 @@ class Odoo
         }
 
         return $this->uid;
-    }
-
-    /**
-     * @param array $options
-     * @return array
-     */
-    protected function resolveOptions(array $options)
-    {
-        $optionsResolver = new OptionsResolver();
-        $optionsResolver
-            ->setDefined('offset')
-            ->setDefined('limit')
-            ->setDefined('order')
-            ->setDefined('fields')
-            ->setDefined('groupBy')
-            ->setDefined('context')
-            ->setDefined('lazy')
-
-            ->setAllowedTypes('offset', 'int')
-            ->setAllowedTypes('limit', 'int')
-            ->setAllowedTypes('order', 'string')
-            ->setAllowedTypes('fields', 'array')
-            ->setAllowedTypes('groupBy', 'string')
-            ->setAllowedTypes('context', 'array')
-            ->setAllowedTypes('lazy', 'bool')
-
-            // For Symfony >= 3.4, we can do it with $resolver->setAllowedTypes('fields', 'string[]');
-            ->setAllowedValues('fields', function (array $fields) {
-                foreach($fields as $field) {
-                    if (! is_string($field)) {
-                        return false;
-                    }
-                }
-
-                return true;
-            })
-
-            ->setDefaults($this->defaultOptions)
-        ;
-
-        return $optionsResolver->resolve($options);
     }
 
     /**
