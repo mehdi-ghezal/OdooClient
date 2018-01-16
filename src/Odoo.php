@@ -48,6 +48,13 @@ class Odoo
     protected $uid;
 
     /**
+     * Context for the current user
+     *
+     * @var array
+     */
+    protected $context = [];
+
+    /**
      * Current users username
      *
      * @var string
@@ -127,16 +134,15 @@ class Odoo
         $this->user = $user;
         $this->password = $password;
         $this->httpClientProvider = $httpClientProvider;
-        $this->clients = array();
+        $this->clients = [];
 
-        $this->defaultOptions = array(
+        $this->defaultOptions = [
             'offset' => 0,
             'limit' => 100,
             'order' => 'name ASC',
-            'fields' => array(),
-            'context' => array(),
+            'context' => [],
             'lazy' => true,
-        );
+        ];
     }
 
     /**
@@ -200,6 +206,21 @@ class Odoo
     }
 
     /**
+     * @return array
+     */
+    public function getContext()
+    {
+        $params = $this->buildParams([
+            'res.users',
+            'context_get'
+        ]);
+
+        $this->debug('Get Context', $params);
+
+        return $this->getClient('object')->call('execute', $params);
+    }
+
+    /**
      * Search records
      *
      * @param array $options Array of options
@@ -218,15 +239,15 @@ class Odoo
 
         $options = $resolver->resolve($options);
 
-        $params = $this->buildParams(array(
+        $params = $this->buildParams([
             $options['model'],
             'search',
             $options['domain'],
             $options['offset'],
             $options['limit'],
             $options['order'],
-            $options['context'],
-        ));
+            array_replace($this->context, $options['context'])
+        ]);
 
         $this->debug(sprintf('Search model %s', $options['model']), $params);
 
@@ -261,7 +282,7 @@ class Odoo
             $options['offset'],
             $options['limit'],
             $options['order'],
-            $options['context'],
+            array_replace($this->context, $options['context'])
         ]);
 
         $this->debug(sprintf('SearchRead model %s', $options['model']), $params);
@@ -289,7 +310,7 @@ class Odoo
             $options['model'],
             'search_count',
             $options['domain'],
-            $options['context'],
+            array_replace($this->context, $options['context'])
         ]);
 
         $this->debug(sprintf('SearchCount model %s', $options['model']), $params);
@@ -319,7 +340,7 @@ class Odoo
             'read',
             $options['ids'],
             $options['fields'],
-            $options['context'],
+            array_replace($this->context, $options['context'])
         ]);
 
         $this->debug(sprintf('Read model %s', $options['model']), $params);
@@ -361,7 +382,7 @@ class Odoo
             $options['groupBy'],
             $options['offset'],
             $options['limit'],
-            $options['context'],
+            array_replace($this->context, $options['context']),
             $options['order'],
             $options['lazy'],
         ]);
@@ -392,7 +413,7 @@ class Odoo
             $options['model'],
             'create',
             $options['data'],
-            $options['context'],
+            array_replace($this->context, $options['context'])
         ]);
 
         $this->debug(sprintf('Create model %s', $options['model']), $params);
@@ -424,7 +445,7 @@ class Odoo
             'write',
             $options['ids'],
             $options['data'],
-            $options['context'],
+            array_replace($this->context, $options['context'])
         ]);
 
         $this->debug(sprintf('Write model %s', $options['model']), $params);
@@ -454,7 +475,7 @@ class Odoo
             $options['model'],
             'unlink',
             $options['ids'],
-            $options['context'],
+            array_replace($this->context, $options['context'])
         ]);
 
         $this->debug(sprintf('Unlink model %s', $options['model']), $params);
@@ -540,7 +561,7 @@ class Odoo
     protected function _searchOrRead($model, array $params)
     {
         // Cache is ON
-        if ($this->cacheActive) {
+        if ($this->cache && $this->cacheActive) {
             $key = $this->calculateCacheKey($params);
             $this->debug(sprintf('Cache lookup for %s with key %s', $model, $key), $params);
 
@@ -623,13 +644,31 @@ class Odoo
     protected function uid()
     {
         if ($this->uid === null) {
-            $client = $this->getClient('common');
+            $cacheKey = '__authentication';
 
-            $this->uid = $client->call('login', [
-                $this->database,
-                $this->user,
-                $this->password
-            ]);
+            // If authentication in cache
+            if ($this->cache && $this->cache->has($cacheKey)) {
+                $data = $this->cache->get($cacheKey);
+
+                $this->uid = $data['uid'];
+                $this->context = $data['context'];
+
+                $this->debug('Authentication get from cache', [$this->uid, $this->context]);
+
+                return $this->uid;
+            }
+
+            // Authenticate
+            $client = $this->getClient('common');
+            $this->uid = $client->call('login', [$this->database, $this->user, $this->password]);
+            $this->context = $this->getContext();
+
+            $this->debug('Authentication with Odoo', [$this->uid, $this->context]);
+
+            // If cache active save in cache
+            if ($this->cache) {
+                $this->cache->set($cacheKey, ['uid' => $this->uid, 'context' => $this->context], new DateInterval('PT30M'));
+            }
         }
 
         return $this->uid;

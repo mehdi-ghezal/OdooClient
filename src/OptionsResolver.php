@@ -30,7 +30,7 @@ class OptionsResolver
      *
      * @param array $defaultOptions
      */
-    public function __construct(array $defaultOptions = array())
+    public function __construct(array $defaultOptions = [])
     {
         $this->defaultOptions = $defaultOptions;
 
@@ -44,7 +44,7 @@ class OptionsResolver
      */
     public function resolve(array $options)
     {
-        $defaults = array();
+        $defaults = [];
 
         foreach ($this->resolver->getDefinedOptions() as $name) {
             if (isset($this->defaultOptions[$name])) {
