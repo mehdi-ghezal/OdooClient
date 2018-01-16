@@ -210,6 +210,8 @@ class Odoo
      */
     public function getContext()
     {
+        $this->authenticate();
+
         $params = $this->buildParams([
             'res.users',
             'context_get'
@@ -238,6 +240,8 @@ class Odoo
         ;
 
         $options = $resolver->resolve($options);
+
+        $this->authenticate();
 
         $params = $this->buildParams([
             $options['model'],
@@ -274,6 +278,8 @@ class Odoo
 
         $options = $resolver->resolve($options);
 
+        $this->authenticate();
+
         $params = $this->buildParams([
             $options['model'],
             'search_read',
@@ -306,6 +312,8 @@ class Odoo
 
         $options = $resolver->resolve($options);
 
+        $this->authenticate();
+
         $params = $this->buildParams([
             $options['model'],
             'search_count',
@@ -334,6 +342,8 @@ class Odoo
         ;
 
         $options = $resolver->resolve($options);
+
+        $this->authenticate();
 
         $params = $this->buildParams([
             $options['model'],
@@ -374,6 +384,8 @@ class Odoo
             $options['context']['group_by_no_leaf'] = true;
         }
 
+        $this->authenticate();
+
         $params = $this->buildParams([
             $options['model'],
             'read_group',
@@ -388,7 +400,6 @@ class Odoo
         ]);
 
         $this->debug(sprintf('ReadGroup model %s', $options['model']), $params);
-
 
         return $this->_searchOrRead($options['model'], $params);
     }
@@ -408,6 +419,8 @@ class Odoo
         ;
 
         $options = $resolver->resolve($options);
+
+        $this->authenticate();
 
         $params = $this->buildParams([
             $options['model'],
@@ -440,6 +453,8 @@ class Odoo
 
         $options = $resolver->resolve($options);
 
+        $this->authenticate();
+
         $params = $this->buildParams([
             $options['model'],
             'write',
@@ -471,6 +486,8 @@ class Odoo
 
         $options = $resolver->resolve($options);
 
+        $this->authenticate();
+
         $params = $this->buildParams([
             $options['model'],
             'unlink',
@@ -498,6 +515,8 @@ class Odoo
         ;
 
         $options = $resolver->resolve($options);
+
+        $this->authenticate();
 
         $client = $this->getClient('report');
         $params = $this->buildParams([$options['report'], $options['ids']]);
@@ -602,7 +621,7 @@ class Odoo
     {
         return array_merge([
             $this->database,
-            $this->uid(),
+            $this->uid,
             $this->password
         ], $params);
     }
@@ -637,11 +656,11 @@ class Odoo
     }
 
     /**
-     * Get uid
+     * Authenticate to Odoo and get the context
      *
-     * @return int $uid
+     * @return int
      */
-    protected function uid()
+    protected function authenticate()
     {
         if ($this->uid === null) {
             $cacheKey = '__authentication';
