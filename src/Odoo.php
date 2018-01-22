@@ -206,6 +206,16 @@ class Odoo
     }
 
     /**
+     * @param $username
+     * @param $password
+     * @return mixed
+     */
+    public function login($username, $password)
+    {
+        return $this->getClient('common')->call('login', [$this->database, $username, $password]);
+    }
+
+    /**
      * @return array
      */
     public function getContext()
