@@ -113,7 +113,6 @@ class OptionsResolver
     {
         $this->resolver
             ->setDefined('domain')
-            ->setRequired('domain')
             ->setAllowedTypes('domain', 'array')
         ;
 

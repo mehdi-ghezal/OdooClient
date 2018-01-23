@@ -139,8 +139,9 @@ class Odoo
         $this->defaultOptions = [
             'offset' => 0,
             'limit' => 100,
-            'order' => 'name ASC',
+            'order' => '',
             'context' => [],
+            'domain' => [],
             'lazy' => true,
         ];
     }
