@@ -599,6 +599,10 @@ class Odoo
             if ($this->cache->has($key)) {
                 $this->debug(sprintf('Cache match for model %s with key %s', $model, $key), $params);
 
+                // Reset cache settings
+                $this->cacheActive = false;
+                $this->cacheTTL = null;
+
                 return $this->cache->get($key);
             }
 
