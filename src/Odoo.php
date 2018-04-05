@@ -102,7 +102,7 @@ class Odoo
      *
      * @var XmlRpcClient[]
      */
-    protected $clients;
+    protected $clients = [];
 
     /**
      * XmlRpc Client
@@ -143,26 +143,18 @@ class Odoo
     /**
      * Odoo constructor.
      *
+     * @param string $host The url
+     * @param string $database The database to log into
+     * @param string $user The username
+     * @param string $password Password of the user
      * @param array $options
      */
-    public function __construct(array $options)
+    public function __construct($host, $database, $user, $password, array $options = [])
     {
         $resolver = new \Symfony\Component\OptionsResolver\OptionsResolver();
         $resolver
-            ->setDefined('host')
-                ->setRequired('host')
-                ->setAllowedTypes('host', 'string')
-            ->setDefined('database')
-                ->setRequired('database')
-                ->setAllowedTypes('database', 'string')
-            ->setDefined('user')
-                ->setRequired('user')
-                ->setAllowedTypes('user', 'string')
-            ->setDefined('password')
-                ->setRequired('password')
-                ->setAllowedTypes('password', 'string')
             ->setDefined('httpClientProvider')
-                ->setAllowedTypes('httpClientProvider', 'callable')
+                ->setAllowedTypes('httpClientProvider', ['callable', 'null'])
                 ->setDefault('httpClientProvider', null)
             ->setDefined('retryOnFailed')
                 ->setAllowedTypes('retryOnFailed', 'boolean')
@@ -177,16 +169,15 @@ class Odoo
 
         $options = $resolver->resolve($options);
 
-        $this->host = $options['host'];
-        $this->database = $options['database'];
-        $this->user = $options['user'];
-        $this->password = $options['password'];
+        $this->host = $host;
+        $this->database = $database;
+        $this->user = $user;
+        $this->password = $password;
+
+        $this->httpClientProvider = $options['httpClientProvider'];
         $this->retryOnFailed = $options['retryOnFailed'];
         $this->retryMaxAttempts = $options['retryMaxAttempts'];
         $this->retryWait = $options['retryWait'];
-
-        $this->httpClientProvider = $options['httpClientProvider'];
-        $this->clients = [];
 
         $this->defaultOptions = [
             'offset' => 0,
