@@ -14,6 +14,7 @@ use Jsg\Odoo\Exception\RuntimeException;
 use Zend\XmlRpc\Client as XmlRpcClient;
 use Zend\XmlRpc\Request;
 use Zend\XmlRpc\Response;
+use Zend\XmlRpc\Client\Exception\FaultException;
 use Psr\SimpleCache\CacheInterface;
 use Psr\Log\LoggerAwareTrait;
 use DateInterval;
@@ -76,6 +77,27 @@ class Odoo
     protected $password;
 
     /**
+     * Retry API Call when call failed
+     *
+     * @var bool
+     */
+    protected $retryOnFailed;
+
+    /**
+     * Maximum time we retry API Call after the first failed call
+     *
+     * @var int
+     */
+    protected $retryMaxAttempts;
+
+    /**
+     * Time in second to wait before retry
+     *
+     * @var int
+     */
+    protected $retryWait;
+
+    /**
      * XmlRpc Clients
      *
      * @var XmlRpcClient[]
@@ -119,21 +141,51 @@ class Odoo
     protected $cacheTTL = null;
 
     /**
-     * Odoo constructor
+     * Odoo constructor.
      *
-     * @param string $host The url
-     * @param string $database The database to log into
-     * @param string $user The username
-     * @param string $password Password of the user
-     * @param callable $httpClientProvider Optional: A callable return a custom Zend\Http\Client to initialize the XmlRpcClient with
+     * @param array $options
      */
-    public function __construct($host, $database, $user, $password, callable $httpClientProvider = null)
+    public function __construct(array $options)
     {
-        $this->host = $host;
-        $this->database = $database;
-        $this->user = $user;
-        $this->password = $password;
-        $this->httpClientProvider = $httpClientProvider;
+        $resolver = new \Symfony\Component\OptionsResolver\OptionsResolver();
+        $resolver
+            ->setDefined('host')
+                ->setRequired('host')
+                ->setAllowedTypes('host', 'string')
+            ->setDefined('database')
+                ->setRequired('database')
+                ->setAllowedTypes('database', 'string')
+            ->setDefined('user')
+                ->setRequired('user')
+                ->setAllowedTypes('user', 'string')
+            ->setDefined('password')
+                ->setRequired('password')
+                ->setAllowedTypes('password', 'string')
+            ->setDefined('httpClientProvider')
+                ->setAllowedTypes('httpClientProvider', 'callable')
+                ->setDefault('httpClientProvider', null)
+            ->setDefined('retryOnFailed')
+                ->setAllowedTypes('retryOnFailed', 'boolean')
+                ->setDefault('retryOnFailed', false)
+            ->setDefined('retryMaxAttempts')
+                ->setAllowedTypes('retryMaxAttempts', 'int')
+                ->setDefault('retryMaxAttempts', 1)
+            ->setDefined('retryWait')
+                ->setAllowedTypes('retryWait', 'int')
+                ->setDefault('retryWait', 1)
+        ;
+
+        $options = $resolver->resolve($options);
+
+        $this->host = $options['host'];
+        $this->database = $options['database'];
+        $this->user = $options['user'];
+        $this->password = $options['password'];
+        $this->retryOnFailed = $options['retryOnFailed'];
+        $this->retryMaxAttempts = $options['retryMaxAttempts'];
+        $this->retryWait = $options['retryWait'];
+
+        $this->httpClientProvider = $options['httpClientProvider'];
         $this->clients = [];
 
         $this->defaultOptions = [
@@ -203,7 +255,7 @@ class Odoo
      */
     public function version()
     {
-        return $this->getClient('common')->call('version');
+        return $this->_call('common', 'version');
     }
 
     /**
@@ -213,7 +265,7 @@ class Odoo
      */
     public function login($username, $password)
     {
-        return $this->getClient('common')->call('login', [$this->database, $username, $password]);
+        return $this->_call('common', 'login', [$this->database, $username, $password]);
     }
 
     /**
@@ -230,7 +282,7 @@ class Odoo
 
         $this->debug('Get Context', $params);
 
-        return $this->getClient('object')->call('execute', $params);
+        return $this->_call('object', 'execute', $params);
     }
 
     /**
@@ -442,7 +494,7 @@ class Odoo
 
         $this->debug(sprintf('Create model %s', $options['model']), $params);
 
-        $response = $this->getClient('object')->call('execute', $params);
+        $response = $this->_call('object', 'execute', $params);
 
         return $response;
     }
@@ -476,7 +528,7 @@ class Odoo
 
         $this->debug(sprintf('Write model %s', $options['model']), $params);
 
-        $response = $this->getClient('object')->call('execute', $params);
+        $response = $this->_call('object', 'execute', $params);
 
         return $response;
     }
@@ -508,7 +560,7 @@ class Odoo
 
         $this->debug(sprintf('Unlink model %s', $options['model']), $params);
 
-        return $this->getClient('object')->call('execute', $params);
+        return $this->_call('object', 'execute', $params);
     }
 
     /**
@@ -529,9 +581,8 @@ class Odoo
 
         $this->authenticate();
 
-        $client = $this->getClient('report');
         $params = $this->buildParams([$options['report'], $options['ids']]);
-        $response = $client->call('render_report', $params);
+        $response = $this->_call('report', 'render_report', $params);
 
         if ($response && isset($response['state']) && $response['state']) {
             return base64_decode($response['result']);
@@ -608,7 +659,7 @@ class Odoo
 
             // Cache didn't match, we request Odoo
             $this->debug(sprintf('Cache not match for model %s with key %s, call Odoo API', $model, $key), $params);
-            $results = $this->getClient('object')->call('execute', $params);
+            $results = $this->_call('object', 'execute', $params);
 
             // Save results in cache, and reset cache settings
             $this->cache->set($key, $results, $this->cacheTTL);
@@ -622,7 +673,7 @@ class Odoo
         // Cache is OFF
         $this->debug(sprintf('Cache not use, call Odoo API for model %s', $model), $params);
 
-        return $this->getClient('object')->call('execute', $params);
+        return $this->_call('object', 'execute', $params);
     }
 
     /**
@@ -671,6 +722,39 @@ class Odoo
     }
 
     /**
+     * Make XmlRpc Call
+     *
+     * @param string $path The api endpoint
+     * @param string $method The api method to call
+     * @param array $args The api method arguments
+     *
+     * @return mixed
+     * @throws FaultException|RuntimeException
+     */
+    protected function _call($path, $method, array $args = [])
+    {
+        if (! $this->retryOnFailed) {
+            return $this->getClient($path)->call($method, $args);
+        }
+
+        $attemptsLeft = max(1, $this->retryMaxAttempts);
+        $e = new RuntimeException(sprintf('Unexpected behaviour in %s', __METHOD__));
+
+        do {
+            try {
+                if ($e instanceof FaultException) {
+                    sleep($this->retryWait);
+                }
+
+                return $this->getClient($path)->call($method, $args);
+            }
+            catch (FaultException $e) {}
+        } while ($attemptsLeft-- > 0);
+
+        throw $e;
+    }
+
+    /**
      * Authenticate to Odoo and get the context
      *
      * @return int
@@ -693,8 +777,7 @@ class Odoo
             }
 
             // Authenticate
-            $client = $this->getClient('common');
-            $this->uid = $client->call('login', [$this->database, $this->user, $this->password]);
+            $this->uid = $this->_call('common', 'login', [$this->database, $this->user, $this->password]);
             $this->context = $this->getContext();
 
             $this->debug('Authentication with Odoo', [$this->uid, $this->context]);
