@@ -178,7 +178,12 @@ class OptionsResolver
     {
         $this->resolver
             ->setDefined('limit')
-            ->setAllowedTypes('limit', 'int')
+            ->setAllowedTypes('limit', ['int', 'boolean'])
+
+            // For Symfony >= 3.4, we can do it with $resolver->setAllowedTypes('fields', 'string[]');
+            ->setAllowedValues('limit', function ($limit) {
+                return $limit !== true;
+            })
         ;
 
         return $this;
