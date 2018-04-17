@@ -70,7 +70,15 @@ class OptionsResolver
             ->registerLazyOptions()
         ;
 
-        return $this->resolver->resolve($defaults);
+        $defaults = [];
+
+        foreach ($this->resolver->getDefinedOptions() as $name) {
+            if (isset($this->defaultOptions[$name])) {
+                $defaults[$name] = $this->defaultOptions[$name];
+            }
+        }
+
+        return $this->resolver->setDefaults($defaults)->resolve($defaults);
     }
 
     /**
