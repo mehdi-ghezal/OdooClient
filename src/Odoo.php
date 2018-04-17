@@ -153,6 +153,9 @@ class Odoo
     {
         $resolver = new \Symfony\Component\OptionsResolver\OptionsResolver();
         $resolver
+            ->setDefined('cache')
+                ->setAllowedTypes('cache', ['Psr\SimpleCache\CacheInterface', 'null'])
+                ->setDefault('cache', null)
             ->setDefined('httpClientProvider')
                 ->setAllowedTypes('httpClientProvider', ['callable', 'null'])
                 ->setDefault('httpClientProvider', null)
@@ -184,6 +187,7 @@ class Odoo
             'limit' => 100,
             'order' => '',
             'context' => [],
+            'fields' => ['id', 'name'],
             'domain' => [],
             'lazy' => true,
         ];
@@ -287,6 +291,8 @@ class Odoo
         $resolver = new OptionsResolver($this->defaultOptions);
         $resolver
             ->registerModelOptions()
+            ->requiredModelOptions()
+
             ->registerDomainOptions()
             ->registerOffsetOptions()
             ->registerLimitOptions()
@@ -323,6 +329,8 @@ class Odoo
         $resolver = new OptionsResolver($this->defaultOptions);
         $resolver
             ->registerModelOptions()
+            ->requiredModelOptions()
+
             ->registerDomainOptions()
             ->registerFieldsOptions()
             ->registerOffsetOptions()
@@ -361,6 +369,8 @@ class Odoo
         $resolver = new OptionsResolver($this->defaultOptions);
         $resolver
             ->registerModelOptions()
+            ->requiredModelOptions()
+
             ->registerDomainOptions()
         ;
 
@@ -391,7 +401,11 @@ class Odoo
         $resolver = new OptionsResolver($this->defaultOptions);
         $resolver
             ->registerModelOptions()
+            ->requiredModelOptions()
+
             ->registerIdsOptions()
+            ->requiredIdsOptions()
+
             ->registerFieldsOptions()
         ;
 
@@ -423,9 +437,15 @@ class Odoo
         $resolver = new OptionsResolver($this->defaultOptions);
         $resolver
             ->registerModelOptions()
-            ->registerDomainOptions()
-            ->registerFieldsOptions()
+            ->requiredModelOptions()
+
             ->registerGroupByOptions()
+            ->requiredGroupByOptions()
+
+            ->registerFieldsOptions()
+            ->requiredFieldsOptions()
+
+            ->registerDomainOptions()
             ->registerOffsetOptions()
             ->registerLimitOptions()
             ->registerOrderOptions()
@@ -469,7 +489,10 @@ class Odoo
         $resolver = new OptionsResolver($this->defaultOptions);
         $resolver
             ->registerModelOptions()
+            ->requiredModelOptions()
+
             ->registerDataOptions()
+            ->requiredDataOptions()
         ;
 
         $options = $resolver->resolve($options);
@@ -501,8 +524,13 @@ class Odoo
         $resolver = new OptionsResolver($this->defaultOptions);
         $resolver
             ->registerModelOptions()
+            ->requiredModelOptions()
+
             ->registerIdsOptions()
+            ->requiredIdsOptions()
+
             ->registerDataOptions()
+            ->requiredDataOptions()
         ;
 
         $options = $resolver->resolve($options);
@@ -535,7 +563,10 @@ class Odoo
         $resolver = new OptionsResolver($this->defaultOptions);
         $resolver
             ->registerModelOptions()
+            ->requiredModelOptions()
+
             ->registerIdsOptions()
+            ->requiredIdsOptions()
         ;
 
         $options = $resolver->resolve($options);
@@ -565,7 +596,10 @@ class Odoo
         $resolver = new OptionsResolver($this->defaultOptions);
         $resolver
             ->registerReportOptions()
+            ->requiredReportOptions()
+
             ->registerIdsOptions()
+            ->requiredIdsOptions()
         ;
 
         $options = $resolver->resolve($options);

@@ -62,16 +62,11 @@ class OptionsResolver
     public function resolveDefaults(array $defaults)
     {
         $this
-            ->registerModelOptions()
-            ->registerReportOptions()
-            ->registerDomainOptions()
-            ->registerGroupByOptions()
-            ->registerFieldsOptions()
-            ->registerDataOptions()
-            ->registerIdsOptions()
             ->registerOffsetOptions()
             ->registerLimitOptions()
             ->registerOrderOptions()
+            ->registerFieldsOptions()
+            ->registerDomainOptions()
             ->registerLazyOptions()
         ;
 
@@ -85,9 +80,18 @@ class OptionsResolver
     {
         $this->resolver
             ->setDefined('model')
-            ->setRequired('model')
             ->setAllowedTypes('model', 'string')
         ;
+
+        return $this;
+    }
+
+    /**
+     * @return $this
+     */
+    public function requiredModelOptions()
+    {
+        $this->resolver->setRequired('model');
 
         return $this;
     }
@@ -99,9 +103,18 @@ class OptionsResolver
     {
         $this->resolver
             ->setDefined('report')
-            ->setRequired('report')
             ->setAllowedTypes('report', 'string')
         ;
+
+        return $this;
+    }
+
+    /**
+     * @return $this
+     */
+    public function requiredReportOptions()
+    {
+        $this->resolver->setRequired('report');
 
         return $this;
     }
@@ -122,13 +135,32 @@ class OptionsResolver
     /**
      * @return $this
      */
+    public function requiredDomainOptions()
+    {
+        $this->resolver->setRequired('domain');
+
+        return $this;
+    }
+
+    /**
+     * @return $this
+     */
     public function registerDataOptions()
     {
         $this->resolver
             ->setDefined('data')
-            ->setRequired('data')
             ->setAllowedTypes('data', 'array')
         ;
+
+        return $this;
+    }
+
+    /**
+     * @return $this
+     */
+    public function requiredDataOptions()
+    {
+        $this->resolver->setRequired('data');
 
         return $this;
     }
@@ -140,7 +172,6 @@ class OptionsResolver
     {
         $this->resolver
             ->setDefined('ids')
-            ->setRequired('ids')
             ->setAllowedTypes('ids', 'array')
 
             // For Symfony >= 3.4, we can do it with $resolver->setAllowedTypes('ids', 'int[]');
@@ -161,12 +192,32 @@ class OptionsResolver
     /**
      * @return $this
      */
+    public function requiredIdsOptions()
+    {
+        $this->resolver->setRequired('ids');
+
+        return $this;
+    }
+
+    /**
+     * @return $this
+     */
     public function registerOffsetOptions()
     {
         $this->resolver
             ->setDefined('offset')
             ->setAllowedTypes('offset', 'int')
         ;
+
+        return $this;
+    }
+
+    /**
+     * @return $this
+     */
+    public function requiredOffsetOptions()
+    {
+        $this->resolver->setRequired('offset');
 
         return $this;
     }
@@ -192,6 +243,16 @@ class OptionsResolver
     /**
      * @return $this
      */
+    public function requiredLimitOptions()
+    {
+        $this->resolver->setRequired('limit');
+
+        return $this;
+    }
+
+    /**
+     * @return $this
+     */
     public function registerOrderOptions()
     {
         $this->resolver
@@ -205,11 +266,20 @@ class OptionsResolver
     /**
      * @return $this
      */
+    public function requiredOrderOptions()
+    {
+        $this->resolver->setRequired('order');
+
+        return $this;
+    }
+
+    /**
+     * @return $this
+     */
     public function registerFieldsOptions()
     {
         $this->resolver
             ->setDefined('fields')
-            ->setRequired('fields')
             ->setAllowedTypes('fields', 'array')
 
             // For Symfony >= 3.4, we can do it with $resolver->setAllowedTypes('fields', 'string[]');
@@ -230,11 +300,20 @@ class OptionsResolver
     /**
      * @return $this
      */
+    public function requiredFieldsOptions()
+    {
+        $this->resolver->setRequired('fields');
+
+        return $this;
+    }
+
+    /**
+     * @return $this
+     */
     public function registerGroupByOptions()
     {
         $this->resolver
             ->setDefined('groupBy')
-            ->setRequired('groupBy')
             ->setAllowedTypes('groupBy', 'array')
 
             // For Symfony >= 3.4, we can do it with $resolver->setAllowedTypes('groupBy', 'string[]');
@@ -255,12 +334,32 @@ class OptionsResolver
     /**
      * @return $this
      */
+    public function requiredGroupByOptions()
+    {
+        $this->resolver->setRequired('groupBy');
+
+        return $this;
+    }
+
+    /**
+     * @return $this
+     */
     public function registerLazyOptions()
     {
         $this->resolver
             ->setDefined('lazy')
             ->setAllowedTypes('lazy', 'bool')
         ;
+
+        return $this;
+    }
+
+    /**
+     * @return $this
+     */
+    public function requiredLazyOptions()
+    {
+        $this->resolver->setRequired('lazy');
 
         return $this;
     }
