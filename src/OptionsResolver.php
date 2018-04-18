@@ -56,10 +56,10 @@ class OptionsResolver
     }
 
     /**
-     * @param array $defaults
+     * @param array $options
      * @return $this
      */
-    public function resolveDefaults(array $defaults)
+    public function resolveDefaults(array $options)
     {
         $this
             ->registerOffsetOptions()
@@ -78,7 +78,7 @@ class OptionsResolver
             }
         }
 
-        return $this->resolver->setDefaults($defaults)->resolve($defaults);
+        return $this->resolver->setDefaults($defaults)->resolve($options);
     }
 
     /**
