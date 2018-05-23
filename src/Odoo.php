@@ -14,7 +14,8 @@ use Jsg\Odoo\Exception\RuntimeException;
 use Zend\XmlRpc\Client as XmlRpcClient;
 use Zend\XmlRpc\Request;
 use Zend\XmlRpc\Response;
-use Zend\XmlRpc\Client\Exception\FaultException;
+use Zend\XmlRpc\Exception\ExceptionInterface as XmlRpcException;
+use Zend\Http\Exception\ExceptionInterface as HttpException;
 use Psr\SimpleCache\CacheInterface;
 use Psr\Log\LoggerAwareTrait;
 use DateInterval;
@@ -754,7 +755,7 @@ class Odoo
      * @param array $args The api method arguments
      *
      * @return mixed
-     * @throws FaultException|RuntimeException
+     * @throws XmlRpcException|HttpException|RuntimeException
      */
     protected function _call($path, $method, array $args = [])
     {
@@ -767,13 +768,14 @@ class Odoo
 
         do {
             try {
-                if ($e instanceof FaultException) {
+                if ($e instanceof XmlRpcException || $e instanceof HttpException) {
                     sleep($this->retryWait);
                 }
 
                 return $this->getClient($path)->call($method, $args);
             }
-            catch (FaultException $e) {}
+            catch (XmlRpcException $e) {}
+            catch (HttpException $e) {}
         } while ($attemptsLeft-- > 0);
 
         throw $e;

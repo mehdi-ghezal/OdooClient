@@ -12,7 +12,7 @@ namespace Jsg\Odoo\Exception;
 /**
  * @author  Mehdi Ghezal <mehdi.ghezal@gmail.com>
  */
-class RuntimeException extends Exception
+class RuntimeException extends \RuntimeException implements ExceptionInterface
 {
 
 }
